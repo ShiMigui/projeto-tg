@@ -1,0 +1,24 @@
+%button {
+  background-color: var(--background);
+  padding: 5px 10px;
+  border: 1px solid var(--primary);
+  background-color: var(--primary);
+  color: var(--background);
+}
+
+.primary,
+.secondary,
+.tertiary {
+  @extend %button;
+}
+
+.secondary {
+  background-color: var(--background);
+  color: var(--primary);
+}
+
+.tertiary {
+  background-color: var(--background);
+  border: var(--background);
+  color: var(--primary);
+}
