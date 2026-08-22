@@ -5,6 +5,27 @@ import "./styles.scss";
 
 type Operator = "+" | "-" | "X" | "/";
 
+type CalculatorState = {
+  display: string;
+  previousValue: number | null;
+  operator: Operator | null;
+  waitingOperand: boolean;
+};
+
+const INITIAL_STATE: CalculatorState = {
+  display: "0",
+  previousValue: null,
+  operator: null,
+  waitingOperand: false,
+};
+
+const ERROR_STATE: CalculatorState = {
+  display: "Error",
+  previousValue: null,
+  operator: null,
+  waitingOperand: true,
+};
+
 function calculate(a: number, b: number, operator: Operator): number {
   switch (operator) {
     case "+":
@@ -23,77 +44,94 @@ function formatResult(value: number): string {
 }
 
 function App() {
-  const [display, setDisplay] = useState("0");
-  const [previousValue, setPreviousValue] = useState<number | null>(null);
-  const [operator, setOperator] = useState<Operator | null>(null);
-  const [waitingOperand, setWaitingOperand] = useState(false);
-
-  function showError() {
-    setDisplay("Error");
-    setPreviousValue(null);
-    setOperator(null);
-    setWaitingOperand(true);
-  }
+  const [calculator, setCalculator] = useState<CalculatorState>(INITIAL_STATE);
+  const { display } = calculator;
 
   function inputDigit(digit: string) {
-    if (waitingOperand) {
-      setDisplay(digit);
-      setWaitingOperand(false);
-      return;
-    }
-    setDisplay((current) => (current === "0" ? digit : current + digit));
+    setCalculator((current) => {
+      if (current.waitingOperand) {
+        return { ...current, display: digit, waitingOperand: false };
+      }
+      return {
+        ...current,
+        display: current.display === "0" ? digit : current.display + digit,
+      };
+    });
   }
 
   function inputDecimalPoint() {
-    if (waitingOperand) {
-      setDisplay("0.");
-      setWaitingOperand(false);
-      return;
-    }
-    setDisplay((current) => (current.includes(".") ? current : current + "."));
+    setCalculator((current) => {
+      if (current.waitingOperand) {
+        return { ...current, display: "0.", waitingOperand: false };
+      }
+      if (current.display.includes(".")) {
+        return current;
+      }
+      return { ...current, display: current.display + "." };
+    });
   }
 
   function chooseOperator(nextOperator: Operator) {
-    if (display === "Error") {
-      return;
-    }
-
-    const currentValue = parseFloat(display);
-
-    if (previousValue !== null && operator !== null && !waitingOperand) {
-      const result = calculate(previousValue, currentValue, operator);
-
-      if (Number.isNaN(result)) {
-        showError();
-        return;
+    setCalculator((current) => {
+      if (current.display === "Error") {
+        return current;
       }
 
-      setPreviousValue(result);
-      setDisplay(formatResult(result));
-    } else {
-      setPreviousValue(currentValue);
-    }
+      const currentValue = parseFloat(current.display);
 
-    setOperator(nextOperator);
-    setWaitingOperand(true);
+      if (
+        current.previousValue !== null &&
+        current.operator !== null &&
+        !current.waitingOperand
+      ) {
+        const result = calculate(
+          current.previousValue,
+          currentValue,
+          current.operator,
+        );
+
+        if (Number.isNaN(result)) {
+          return ERROR_STATE;
+        }
+
+        return {
+          display: formatResult(result),
+          previousValue: result,
+          operator: nextOperator,
+          waitingOperand: true,
+        };
+      }
+
+      return {
+        ...current,
+        previousValue: currentValue,
+        operator: nextOperator,
+        waitingOperand: true,
+      };
+    });
   }
 
   function evaluate() {
-    if (previousValue === null || operator === null || waitingOperand) {
-      return;
-    }
+    setCalculator((current) => {
+      const { previousValue, operator, waitingOperand } = current;
 
-    const result = calculate(previousValue, parseFloat(display), operator);
+      if (previousValue === null || operator === null || waitingOperand) {
+        return current;
+      }
 
-    if (Number.isNaN(result)) {
-      showError();
-      return;
-    }
+      const result = calculate(previousValue, parseFloat(current.display), operator);
 
-    setDisplay(formatResult(result));
-    setPreviousValue(null);
-    setOperator(null);
-    setWaitingOperand(true);
+      if (Number.isNaN(result)) {
+        return ERROR_STATE;
+      }
+
+      return {
+        display: formatResult(result),
+        previousValue: null,
+        operator: null,
+        waitingOperand: true,
+      };
+    });
   }
 
   return (
