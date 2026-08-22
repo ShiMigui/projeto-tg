@@ -46,6 +46,10 @@ function formatResult(value: number): string {
 function App() {
   const [calculator, setCalculator] = useState<CalculatorState>(INITIAL_STATE);
   const { display } = calculator;
+  const operation =
+    calculator.previousValue !== null && calculator.operator !== null
+      ? `${formatResult(calculator.previousValue)} ${calculator.operator}`
+      : undefined;
 
   function inputDigit(digit: string) {
     setCalculator((current) => {
@@ -138,7 +142,7 @@ function App() {
     <>
       <main>
         <div id="calculator">
-          <Display value={display} />
+          <Display value={display} operation={operation} />
           <Button onClick={() => inputDigit("7")}>7</Button>
           <Button onClick={() => inputDigit("8")}>8</Button>
           <Button onClick={() => inputDigit("9")}>9</Button>
