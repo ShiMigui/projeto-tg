@@ -46,7 +46,7 @@ function currentOperand(expression: string): string | null {
 }
 
 function parseOperand(operand: string | null): number {
-  return operand === null || operand === "-" ? 0 : parseFloat(operand);
+  return operand === null ? 0 : parseFloat(operand);
 }
 
 function calculate(a: number, b: number, operator: Operator): number {
@@ -69,10 +69,6 @@ function formatResult(value: number): string {
 function App() {
   const [calculator, setCalculator] = useState<CalculatorState>(INITIAL_STATE);
   const { display } = calculator;
-
-  function allClear() {
-    setCalculator(INITIAL_STATE);
-  }
 
   function clearEntry() {
     setCalculator((current) => {
@@ -105,10 +101,6 @@ function App() {
           return { ...current, display: `${current.display.slice(0, -1)}${digit}` };
         }
 
-        if (operand === "-0") {
-          return { ...current, display: `${current.display.slice(0, -2)}${digit}` };
-        }
-
         return { ...current, display: `${current.display}${digit}` };
       }
 
@@ -132,44 +124,11 @@ function App() {
 
       const operand = currentOperand(current.display) ?? "";
 
-      if (operand === "") {
-        return { ...current, display: "0.", waitingOperand: false };
-      }
-
       if (operand.includes(".")) {
         return current;
       }
 
-      if (operand === "-" || operand === "-0") {
-        return { ...current, display: `${current.display}0.`, waitingOperand: false };
-      }
-
       return { ...current, display: `${current.display}.`, waitingOperand: false };
-    });
-  }
-
-  function toggleSign() {
-    setCalculator((current) => {
-      if (current.display === "Error") {
-        return current;
-      }
-
-      const operand = currentOperand(current.display);
-
-      if (operand === null) {
-        return { ...current, display: `${current.display}-`, waitingOperand: false };
-      }
-
-      if (operand.startsWith("-")) {
-        const stripped = current.display.slice(0, -operand.length) + operand.slice(1);
-        return {
-          ...current,
-          display: stripped === "" ? "0" : stripped,
-          waitingOperand: false,
-        };
-      }
-
-      return { ...current, display: `${current.display}-`, waitingOperand: false };
     });
   }
 
@@ -254,14 +213,8 @@ function App() {
       <main>
         <div id="calculator">
           <Display value={display} />
-          <Button variant="secondary" className="ac" onClick={allClear}>
-            AC
-          </Button>
-          <Button variant="secondary" onClick={clearEntry}>
+          <Button variant="secondary" className="clear" onClick={clearEntry}>
             C
-          </Button>
-          <Button variant="tertiary" onClick={toggleSign}>
-            +/-
           </Button>
           <Button onClick={() => inputDigit("7")}>7</Button>
           <Button onClick={() => inputDigit("8")}>8</Button>
