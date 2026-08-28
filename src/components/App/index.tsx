@@ -3,7 +3,9 @@ import Button from "../Button";
 import Display from "../Display";
 import "./styles.scss";
 
-type Operator = "+" | "-" | "X" | "/";
+const OPERATORS = ["+", "-", "X", "/"] as const;
+
+type Operator = (typeof OPERATORS)[number];
 
 type CalculatorState = {
   display: string;
@@ -26,6 +28,27 @@ const ERROR_STATE: CalculatorState = {
   waitingOperand: true,
 };
 
+function isOperatorToken(token: string): boolean {
+  return (OPERATORS as readonly string[]).includes(token);
+}
+
+function endsWithOperator(expression: string): boolean {
+  return isOperatorToken(expression.trimEnd().split(" ").pop() ?? "");
+}
+
+function currentOperand(expression: string): string | null {
+  const parts = expression.trimEnd().split(" ");
+  const token = parts[parts.length - 1] ?? "";
+  if (parts.length > 1 && isOperatorToken(token)) {
+    return null;
+  }
+  return token === "" ? null : token;
+}
+
+function parseOperand(operand: string | null): number {
+  return operand === null || operand === "-" ? 0 : parseFloat(operand);
+}
+
 function calculate(a: number, b: number, operator: Operator): number {
   switch (operator) {
     case "+":
@@ -46,32 +69,107 @@ function formatResult(value: number): string {
 function App() {
   const [calculator, setCalculator] = useState<CalculatorState>(INITIAL_STATE);
   const { display } = calculator;
-  const operation =
-    calculator.previousValue !== null && calculator.operator !== null
-      ? `${formatResult(calculator.previousValue)} ${calculator.operator}`
-      : undefined;
+
+  function allClear() {
+    setCalculator(INITIAL_STATE);
+  }
+
+  function clearEntry() {
+    setCalculator((current) => {
+      if (current.display === "Error") {
+        return { ...INITIAL_STATE };
+      }
+
+      const trimmed = current.display.trimEnd();
+      const parts = trimmed.split(" ");
+      const last = parts[parts.length - 1];
+
+      if (parts.length > 1 && !isOperatorToken(last)) {
+        return {
+          ...current,
+          display: `${trimmed.slice(0, -(last.length + 1))} `,
+          waitingOperand: true,
+        };
+      }
+
+      return { ...current, display: "0", waitingOperand: false };
+    });
+  }
 
   function inputDigit(digit: string) {
     setCalculator((current) => {
-      if (current.waitingOperand) {
-        return { ...current, display: digit, waitingOperand: false };
+      if (!current.waitingOperand) {
+        const operand = currentOperand(current.display);
+
+        if (operand === "0") {
+          return { ...current, display: `${current.display.slice(0, -1)}${digit}` };
+        }
+
+        if (operand === "-0") {
+          return { ...current, display: `${current.display.slice(0, -2)}${digit}` };
+        }
+
+        return { ...current, display: `${current.display}${digit}` };
       }
-      return {
-        ...current,
-        display: current.display === "0" ? digit : current.display + digit,
-      };
+
+      if (endsWithOperator(current.display)) {
+        return { ...current, display: `${current.display}${digit}`, waitingOperand: false };
+      }
+
+      return { ...current, display: digit, waitingOperand: false };
     });
   }
 
   function inputDecimalPoint() {
     setCalculator((current) => {
+      if (current.waitingOperand && endsWithOperator(current.display)) {
+        return { ...current, display: `${current.display}0.`, waitingOperand: false };
+      }
+
       if (current.waitingOperand) {
         return { ...current, display: "0.", waitingOperand: false };
       }
-      if (current.display.includes(".")) {
+
+      const operand = currentOperand(current.display) ?? "";
+
+      if (operand === "") {
+        return { ...current, display: "0.", waitingOperand: false };
+      }
+
+      if (operand.includes(".")) {
         return current;
       }
-      return { ...current, display: current.display + "." };
+
+      if (operand === "-" || operand === "-0") {
+        return { ...current, display: `${current.display}0.`, waitingOperand: false };
+      }
+
+      return { ...current, display: `${current.display}.`, waitingOperand: false };
+    });
+  }
+
+  function toggleSign() {
+    setCalculator((current) => {
+      if (current.display === "Error") {
+        return current;
+      }
+
+      const operand = currentOperand(current.display);
+
+      if (operand === null) {
+        return { ...current, display: `${current.display}-`, waitingOperand: false };
+      }
+
+      if (operand.startsWith("-")) {
+        const stripped = current.display.slice(0, -operand.length) + operand.slice(1);
+        return {
+          ...current,
+          display: stripped === "" ? "0" : stripped,
+          waitingOperand: false,
+        };
+      }
+
+      return { ...current, display: `${current.display}-`, waitingOperand: false };
     });
   }
 
@@ -81,25 +179,34 @@ function App() {
         return current;
       }
 
-      const currentValue = parseFloat(current.display);
+      if (current.waitingOperand && endsWithOperator(current.display)) {
+        return {
+          ...current,
+          display: `${current.display.trimEnd().slice(0, -1)}${nextOperator} `,
+          operator: nextOperator,
+        };
+      }
 
-      if (
-        current.previousValue !== null &&
-        current.operator !== null &&
-        !current.waitingOperand
-      ) {
-        const result = calculate(
-          current.previousValue,
-          currentValue,
-          current.operator,
-        );
+      const operand = parseOperand(currentOperand(current.display));
+
+      if (current.previousValue !== null && current.operator !== null) {
+        if (current.waitingOperand) {
+          return {
+            ...current,
+            display: `${current.display} ${nextOperator} `,
+            previousValue: parseOperand(current.display),
+            operator: nextOperator,
+          };
+        }
+
+        const result = calculate(current.previousValue, operand, current.operator);
 
         if (Number.isNaN(result)) {
           return ERROR_STATE;
         }
 
         return {
-          display: formatResult(result),
+          display: `${current.display} ${nextOperator} `,
           previousValue: result,
           operator: nextOperator,
           waitingOperand: true,
@@ -107,8 +214,8 @@ function App() {
       }
 
       return {
-        ...current,
-        previousValue: currentValue,
+        display: `${current.display} ${nextOperator} `,
+        previousValue: operand,
         operator: nextOperator,
         waitingOperand: true,
       };
@@ -117,24 +224,28 @@ function App() {
 
   function evaluate() {
     setCalculator((current) => {
-      const { previousValue, operator, waitingOperand } = current;
-
-      if (previousValue === null || operator === null || waitingOperand) {
+      if (current.display === "Error") {
         return current;
       }
 
-      const result = calculate(previousValue, parseFloat(current.display), operator);
+      const operand = parseOperand(currentOperand(current.display));
 
-      if (Number.isNaN(result)) {
-        return ERROR_STATE;
+      if (current.operator !== null && current.previousValue !== null) {
+        const result = calculate(current.previousValue, operand, current.operator);
+
+        if (Number.isNaN(result)) {
+          return ERROR_STATE;
+        }
+
+        return {
+          display: formatResult(result),
+          previousValue: null,
+          operator: null,
+          waitingOperand: true,
+        };
       }
 
-      return {
-        display: formatResult(result),
-        previousValue: null,
-        operator: null,
-        waitingOperand: true,
-      };
+      return { ...current, display: formatResult(operand), waitingOperand: true };
     });
   }
 
@@ -142,7 +253,16 @@ function App() {
     <>
       <main>
         <div id="calculator">
-          <Display value={display} operation={operation} />
+          <Display value={display} />
+          <Button variant="secondary" className="ac" onClick={allClear}>
+            AC
+          </Button>
+          <Button variant="secondary" onClick={clearEntry}>
+            C
+          </Button>
+          <Button variant="tertiary" onClick={toggleSign}>
+            +/-
+          </Button>
           <Button onClick={() => inputDigit("7")}>7</Button>
           <Button onClick={() => inputDigit("8")}>8</Button>
           <Button onClick={() => inputDigit("9")}>9</Button>

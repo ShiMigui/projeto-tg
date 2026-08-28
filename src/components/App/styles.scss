@@ -32,4 +32,7 @@ main {
   button {
     font-size: 3rem;
   }
+  button.ac {
+    grid-column: span 2;
+  }
 }
